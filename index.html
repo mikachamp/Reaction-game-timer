@@ -1,10 +1,2272 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>PULSE // 3D Reaction Timer & Precision Benchmark</title>
+    <meta name="description" content="A premium 3D reaction timer benchmark using Three.js and vanilla JavaScript to test visual reflexes with millisecond precision.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        /* Design System CSS variables */
+        :root {
+            --bg-color: #0F172A;
+            --surface-color: rgba(30, 41, 59, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
+            
+            --state-idle: #10B981;
+            --state-ready: #34D399;
+            --state-waiting: #F59E0B;
+            --state-results: #10B981;
+            --state-error: #EF4444;
+
+            --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.3);
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Base Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(15, 23, 42, 0.9) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.4);
+        }
+
+        /* Container & Layout */
+        .container {
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header styling */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--surface-border);
+            margin-bottom: 1.5rem;
+        }
+
+        .branding {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.75rem;
+            letter-spacing: 0.15em;
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--state-ready);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--state-ready);
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            font-family: var(--font-display);
+            letter-spacing: 0.2em;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .btn-icon {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            color: var(--text-primary);
+            padding: 0.6rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-smooth);
+            backdrop-filter: blur(12px);
+        }
+
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Glassmorphic Panel (Card) */
+        .glass-panel {
+            background: var(--surface-color);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--surface-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Grid Layout */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr 340px;
+            gap: 1.5rem;
+            flex: 1;
+            align-items: stretch;
+        }
+
+        /* Left Side: Rules & State */
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .status-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 180px;
+            text-align: center;
+            border-width: 2px;
+            border-color: rgba(59, 130, 246, 0.2);
+            transition: var(--transition-smooth);
+        }
+
+        .status-card.state-idle { border-color: rgba(59, 130, 246, 0.4); box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
+        .status-card.state-waiting { border-color: rgba(245, 158, 11, 0.4); box-shadow: 0 0 15px rgba(245, 158, 11, 0.1); }
+        .status-card.state-ready { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 25px rgba(16, 185, 129, 0.2); }
+        .status-card.state-results { border-color: rgba(59, 130, 246, 0.4); box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
+        .status-card.state-error { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 25px rgba(239, 68, 68, 0.2); }
+
+        .status-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .status-value {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            transition: var(--transition-smooth);
+        }
+
+        .state-idle .status-value { color: var(--text-primary); }
+        .state-waiting .status-value { color: var(--state-waiting); }
+        .state-ready .status-value { color: var(--state-ready); }
+        .state-results .status-value { color: var(--state-ready); }
+        .state-error .status-value { color: var(--state-error); }
+
+        .status-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.75rem;
+            max-width: 90%;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            border: none;
+            color: white;
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 1.1rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: var(--transition-smooth);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(16, 185, 129, 0.5), 0 0 15px rgba(52, 211, 153, 0.3);
+            background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary:disabled {
+            background: rgba(148, 163, 184, 0.1);
+            color: rgba(148, 163, 184, 0.4);
+            border: 1px solid rgba(255,255,255,0.02);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(148, 163, 184, 0.2);
+            transition: .3s;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        input:checked + .slider {
+            background-color: var(--state-idle);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .instructions-card {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .instructions-card h3 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .instructions-list {
+            list-style-type: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .instructions-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .instructions-list li::before {
+            content: "•";
+            color: var(--state-idle);
+            font-weight: bold;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        /* Center Column: 3D Stimulus viewport */
+        .center-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            position: relative;
+        }
+
+        .stimulus-viewport {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding: 0;
+            cursor: pointer;
+            border-width: 1px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Shake animation for false start */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+            20%, 40%, 60%, 80% { transform: translateX(6px); }
+        }
+
+        .stimulus-viewport.false-start-shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.25);
+        }
+
+        .stimulus-viewport.state-ready {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 35px rgba(16, 185, 129, 0.15);
+        }
+
+        .stimulus-viewport.state-waiting {
+            border-color: rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 30px rgba(245, 158, 11, 0.1);
+        }
+
+        #three-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 0.95rem;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Viewport overlay controls */
+        .viewport-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1.5rem;
+            background: radial-gradient(circle at center, transparent 30%, rgba(15, 23, 42, 0.45) 100%);
+            border-radius: 0.95rem;
+        }
+
+        .viewport-status-badge {
+            align-self: flex-start;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 0.4rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            backdrop-filter: blur(8px);
+        }
+
+        .viewport-badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--text-secondary);
+        }
+
+        .state-waiting .viewport-badge-dot { background-color: var(--state-waiting); box-shadow: 0 0 8px var(--state-waiting); }
+        .state-ready .viewport-badge-dot { background-color: var(--state-ready); box-shadow: 0 0 10px var(--state-ready); }
+        .state-results .viewport-badge-dot { background-color: var(--state-results); box-shadow: 0 0 8px var(--state-results); }
+        .state-error .viewport-badge-dot { background-color: var(--state-error); box-shadow: 0 0 10px var(--state-error); }
+
+        .viewport-prompt {
+            align-self: center;
+            margin-top: auto;
+            margin-bottom: auto;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 1.15rem;
+            font-family: var(--font-display);
+            font-weight: 500;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: var(--shadow-sm);
+            transform: translateY(0);
+            transition: var(--transition-smooth);
+            animation: bounce-slow 3s infinite ease-in-out;
+        }
+
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .state-waiting .viewport-prompt {
+            opacity: 0.6;
+            animation: pulse-prompt 1.5s infinite ease-in-out;
+        }
+
+        .state-ready .viewport-prompt {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #ffffff;
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
+            animation: flash-prompt 0.2s infinite alternate;
+        }
+
+        @keyframes pulse-prompt {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+
+        @keyframes flash-prompt {
+            0% { transform: scale(1.0); }
+            100% { transform: scale(1.05); }
+        }
+
+        .viewport-footer {
+            margin-top: auto;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(6px);
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.5rem;
+            align-self: center;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        /* Right Column: Statistics */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-subcard {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-subcard.full-width {
+            grid-column: span 2;
+        }
+
+        .stat-meta {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-num {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-subcard.highlight .stat-num {
+            color: var(--state-ready);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+        }
+
+        /* SVG Chart Card */
+        .chart-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 170px;
+        }
+
+        .chart-title-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .chart-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-placeholder {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+            max-width: 80%;
+        }
+
+        /* Run History */
+        .history-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 240px;
+            max-height: 320px;
+        }
+
+        .history-title-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .history-list {
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-right: 0.25rem;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            transition: var(--transition-smooth);
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .history-number {
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .history-time-value {
+            font-weight: 600;
+            font-family: var(--font-display);
+            color: var(--text-primary);
+        }
+
+        .rating-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-godlike { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-fast { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-average { background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-slow { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-ai { background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); margin-left: 0.25rem; }
+
+        /* AI Overlay Banner */
+        .ai-overlay-banner {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            backdrop-filter: blur(12px);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #C084FC;
+            z-index: 20;
+            box-shadow: 0 4px 20px rgba(168, 85, 247, 0.25);
+        }
+
+        .btn-skip-ai {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-skip-ai:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #F87171;
+        }
+
+        .btn-icon.ai-active {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: rgba(168, 85, 247, 0.5);
+            color: #C084FC;
+            animation: pulse-glow 1.5s infinite ease-in-out;
+        }
+
+        /* Modal Settings & Info Overlay */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 1.5rem;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #1E293B;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1.25rem;
+            width: 100%;
+            max-width: 520px;
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            transform: scale(0.95) translateY(10px);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .modal-title {
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            transition: var(--transition-smooth);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .modal-body {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .modal-body h4 {
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-body p {
+            line-height: 1.6;
+        }
+
+        .modal-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .modal-body th, .modal-body td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .modal-body th {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Footer styling */
+        footer {
+            margin-top: auto;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--surface-border);
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .footer-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition-smooth);
+        }
+
+        .footer-link:hover {
+            color: var(--state-idle);
+        }
+
+        /* Glow animation */
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--state-ready); }
+            50% { transform: scale(1.15); box-shadow: 0 0 18px var(--state-ready); }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1100px) {
+            .dashboard {
+                grid-template-columns: 280px 1fr;
+            }
+            .right-column {
+                grid-column: span 2;
+                flex-direction: row;
+                align-items: stretch;
+            }
+            .stats-grid {
+                flex: 1;
+            }
+            .chart-card {
+                flex: 1;
+            }
+            .history-card {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .left-column, .right-column {
+                grid-column: span 1;
+            }
+            .right-column {
+                flex-direction: column;
+            }
+            .stimulus-viewport {
+                min-height: 380px;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .stat-subcard.full-width {
+                grid-column: span 1;
+            }
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            .actions-bar {
+                align-self: stretch;
+                justify-content: space-between;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello world! </h1>
+    <div class="container">
+        <!-- Application Header -->
+        <header>
+            <div class="branding">
+                <div class="logo">
+                    PULSE <span class="logo-dot"></span>
+                </div>
+                <div class="subtitle">3D PRECISION REACTION BENCHMARK</div>
+            </div>
+            <div class="actions-bar">
+                <button class="btn-icon" id="btn-ai-demo" title="Run AI Autonomous Test Runs">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A1.5,1.5 0 0,0 6,14.5A1.5,1.5 0 0,0 7.5,16A1.5,1.5 0 0,0 9,14.5A1.5,1.5 0 0,0 7.5,13M16.5,13A1.5,1.5 0 0,0 15,14.5A1.5,1.5 0 0,0 16.5,16A1.5,1.5 0 0,0 18,14.5A1.5,1.5 0 0,0 16.5,13M9,18V19H15V18H9Z" />
+                    </svg>
+                </button>
+                <button class="btn-icon" id="btn-audio-toggle" title="Toggle audio feedback">
+                    <!-- Volume High SVG -->
+                    <svg id="icon-volume-high" viewBox="0 0 24 24">
+                        <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.85 14,18.71V20.77C18.03,19.86 21,16.28 21,12C21,7.72 18.03,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.77 16.5,12M3,9V15H7L12,20V4L7,9H3Z" />
+                    </svg>
+                    <!-- Volume Mute SVG (hidden by default) -->
+                    <svg id="icon-volume-mute" viewBox="0 0 24 24" style="display: none;">
+                        <path d="M12,4L9.91,6.09L12,8.18M4.27,3L3,4.27L7.73,9H3V15H7L12,20V13.27L16.25,17.53C15.58,18.04 14.83,18.46 14,18.7V20.77C15.38,20.44 16.63,19.79 17.7,18.9L20.73,21.92L22,20.65L4.27,3M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18.03,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.48,12.43 16.5,12.22 16.5,12Z" />
+                    </svg>
+                </button>
+                <button class="btn-icon" id="btn-info-modal" title="View benchmarking rules & categories">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+                    </svg>
+                </button>
+                <button class="btn-icon" id="btn-clear-stats" title="Reset all bench statistics">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19.36,2.72L20.78,4.14L18.66,6.26L17.24,4.84L19.36,2.72M5.93,17.57C3.92,15.56 2.69,12.77 2.69,9.69C2.69,3.56 7.69,0.76 7.69,0.76C7.69,0.76 6.37,3.56 8.78,5.97C11.19,8.38 14.62,8.4 14.62,8.4C14.62,8.4 11.23,10.23 11.23,14.62C11.23,17.7 9.95,20.5 7.94,22.5L5.93,17.57M16.19,7.31L17.61,8.73L15.49,10.85L14.07,9.43L16.19,7.31M13.02,10.48L14.44,11.9L12.32,14.02L10.9,12.6L13.02,10.48M9.85,13.65L11.27,15.07L9.15,17.19L7.73,15.77L9.85,13.65Z" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard -->
+        <main class="dashboard">
+            <!-- Left Column: Controls & Instructions -->
+            <div class="left-column">
+                <!-- Status Display -->
+                <div class="glass-panel status-card state-idle" id="panel-status">
+                    <div class="status-label" id="status-label">Engine Ready</div>
+                    <div class="status-value" id="status-value">Ready</div>
+                    <div class="status-desc" id="status-desc">Press START below or spacebar to prime the benchmark.</div>
+                </div>
+
+                <!-- Game Primary Actions -->
+                <div class="glass-panel control-panel">
+                    <button class="btn-primary" id="btn-start-game">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
+                        </svg>
+                        START BENCHMARK
+                    </button>
+                    
+                    <div class="toggle-container">
+                        <span class="toggle-label">Keyboard Trigger (Space)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-keyboard" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="toggle-container">
+                        <span class="toggle-label">🤖 AI Auto-Player Mode</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-ai-mode">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Guidelines Card -->
+                <div class="glass-panel instructions-card">
+                    <h3>Benchmarking Rules</h3>
+                    <ul class="instructions-list">
+                        <li>Click **START BENCHMARK** to trigger a test run.</li>
+                        <li>The shape in the viewport will morph into an amber pulsing state.</li>
+                        <li>**Wait patiently**. In 1 to 5 seconds, the shape will rapidly flash green and start spinning.</li>
+                        <li>React as **fast** as you can by tapping the canvas viewport or hitting the Spacebar.</li>
+                        <li>Any click *prior* to the green flash constitutes a **False Start**.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Center Column: 3D Stimulus viewport -->
+            <div class="center-column">
+                <div class="glass-panel stimulus-viewport" id="viewport-click-area">
+                    <!-- WebGL Canvas -->
+                    <canvas id="three-canvas"></canvas>
+
+                    <!-- User Interfaces Overlaid on top of 3D Scene -->
+                    <div class="viewport-overlay">
+                        <div class="ai-overlay-banner" id="ai-overlay-banner" style="display: none;">
+                            <span id="ai-banner-text">🤖 AI Calibration Run 1/3</span>
+                            <button class="btn-skip-ai" id="btn-skip-ai">Skip AI Demo</button>
+                        </div>
+
+                        <div class="viewport-status-badge" id="viewport-status-badge">
+                            <span class="viewport-badge-dot"></span>
+                            <span id="viewport-badge-text">Idle</span>
+                        </div>
+
+                        <div class="viewport-prompt" id="viewport-prompt-text">
+                            Tap Canvas or Spacebar
+                        </div>
+
+                        <div class="viewport-footer" id="viewport-footer-text">
+                            WebGL 3D Context Enabled
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Stats & Run History -->
+            <div class="right-column">
+                <!-- Numerical Statistics -->
+                <div class="stats-grid">
+                    <div class="glass-panel stat-subcard highlight">
+                        <span class="stat-meta">Best Reaction</span>
+                        <span class="stat-num" id="stat-best">--</span>
+                    </div>
+                    <div class="glass-panel stat-subcard">
+                        <span class="stat-meta">Attempts</span>
+                        <span class="stat-num" id="stat-attempts">0</span>
+                    </div>
+                    <div class="glass-panel stat-subcard full-width">
+                        <span class="stat-meta">Average Reaction Time</span>
+                        <span class="stat-num" id="stat-average">--</span>
+                    </div>
+                </div>
+
+                <!-- SVG Chart Dashboard -->
+                <div class="glass-panel chart-card">
+                    <div class="chart-title-area">
+                        <span class="chart-title">Bench History Curve</span>
+                    </div>
+                    <div class="chart-container" id="chart-container">
+                        <div class="chart-placeholder" id="chart-placeholder">
+                            Benchmark runs are displayed here as a reflex curve line-graph.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History runs -->
+                <div class="glass-panel history-card">
+                    <div class="history-title-area">
+                        <span class="chart-title">Run Log</span>
+                    </div>
+                    <div class="history-list" id="history-list">
+                        <!-- History logs loaded dynamically here -->
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.75rem; margin-top: 3rem;">
+                            No runs recorded in this session.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Application Footer -->
+        <footer>
+            <div>Pulse Precision Reflex Benchmark &copy; 2026</div>
+            <div class="footer-links">
+                <a href="#" class="footer-link" id="link-rules">Benchmarking Scale</a>
+                <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer" class="footer-link">Three.js API</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Info Overlay Modal -->
+    <div class="modal" id="info-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Benchmarking Details</h3>
+                <button class="modal-close" id="modal-close-btn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <h4>Precision Metrology</h4>
+                    <p>This benchmark measures motor reaction time using Javascript's High Resolution Time API (`performance.now()`). It isolates and records human response lag triggered by visual stimuli on high refresh rate displays.</p>
+                </div>
+                <div>
+                    <h4>Performance Target</h4>
+                    <p>To prevent graphics calculations from introducing artificial input latency, the 3D scene utilizes optimized geometries, simplified shader calls, and garbage-collected objects. Rendering runs on a dedicated WebGL context.</p>
+                </div>
+                <div>
+                    <h4>Reflex Ratings Scale</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Reflex Latency</th>
+                                <th>Classification</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span style="color: #34D399; font-weight: bold;">&lt; 150 ms</span></td>
+                                <td>Superhuman / Pro-Gamer</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #60A5FA; font-weight: bold;">150 - 250 ms</span></td>
+                                <td>Fast / Optimal Reflexes</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #FBBF24; font-weight: bold;">250 - 400 ms</span></td>
+                                <td>Average / Standard</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #F87171; font-weight: bold;">&gt; 400 ms</span></td>
+                                <td>Sluggish Response</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // Constants & Config
+        const CONFIG = {
+            MIN_DELAY: 1000, // ms
+            MAX_DELAY: 5000, // ms
+            MAX_HISTORY_ENTRIES: 10,
+            SOUNDS: {
+                TICK: 'tick',
+                READY: 'ready',
+                SUCCESS: 'success',
+                ERROR: 'error'
+            }
+        };
+
+        // Game State Machine Definition
+        const STATES = {
+            IDLE: 'IDLE',
+            WAITING: 'WAITING',
+            STIMULUS: 'STIMULUS',
+            RESULT: 'RESULT',
+            FALSE_START: 'FALSE_START'
+        };
+
+        // Application State Variables
+        let currentState = STATES.IDLE;
+        let sessionRuns = [];
+        let timerStart = 0;
+        let stimulusTimeoutId = null;
+        let keyboardEnabled = true;
+
+        // UI DOM Elements Cache
+        const DOM = {
+            statusPanel: document.getElementById('panel-status'),
+            statusLabel: document.getElementById('status-label'),
+            statusValue: document.getElementById('status-value'),
+            statusDesc: document.getElementById('status-desc'),
+            btnStart: document.getElementById('btn-start-game'),
+            toggleKeyboard: document.getElementById('toggle-keyboard'),
+            toggleAiMode: document.getElementById('toggle-ai-mode'),
+            viewportClickArea: document.getElementById('viewport-click-area'),
+            viewportBadgeText: document.getElementById('viewport-badge-text'),
+            viewportBadgeDot: document.querySelector('.viewport-badge-dot'),
+            viewportPromptText: document.getElementById('viewport-prompt-text'),
+            statBest: document.getElementById('stat-best'),
+            statAttempts: document.getElementById('stat-attempts'),
+            statAverage: document.getElementById('stat-average'),
+            chartContainer: document.getElementById('chart-container'),
+            historyList: document.getElementById('history-list'),
+            infoModal: document.getElementById('info-modal'),
+            btnInfoModal: document.getElementById('btn-info-modal'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+            btnClearStats: document.getElementById('btn-clear-stats'),
+            btnAudioToggle: document.getElementById('btn-audio-toggle'),
+            iconVolumeHigh: document.getElementById('icon-volume-high'),
+            iconVolumeMute: document.getElementById('icon-volume-mute'),
+            linkRules: document.getElementById('link-rules'),
+            btnAiDemo: document.getElementById('btn-ai-demo'),
+            aiOverlayBanner: document.getElementById('ai-overlay-banner'),
+            aiBannerText: document.getElementById('ai-banner-text'),
+            btnSkipAi: document.getElementById('btn-skip-ai')
+        };
+
+        /* ==========================================
+           1. WEB AUDIO FEEDBACK ENGINE (SYNTHESIZER)
+           ========================================== */
+        const AudioEngine = {
+            ctx: null,
+            muted: false,
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            toggleMute() {
+                this.muted = !this.muted;
+                if (this.muted) {
+                    DOM.iconVolumeHigh.style.display = 'none';
+                    DOM.iconVolumeMute.style.display = 'block';
+                } else {
+                    DOM.iconVolumeHigh.style.display = 'block';
+                    DOM.iconVolumeMute.style.display = 'none';
+                    this.init();
+                }
+                return this.muted;
+            },
+
+            play(type, arg = null) {
+                if (this.muted) return;
+                
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+
+                    switch (type) {
+                        case CONFIG.SOUNDS.TICK:
+                            this.synthesizeTick(now);
+                            break;
+                        case CONFIG.SOUNDS.READY:
+                            this.synthesizeReady(now);
+                            break;
+                        case CONFIG.SOUNDS.SUCCESS:
+                            this.synthesizeSuccess(now, arg);
+                            break;
+                        case CONFIG.SOUNDS.ERROR:
+                            this.synthesizeError(now);
+                            break;
+                    }
+                } catch (e) {
+                    console.error('Audio synthesis failed:', e);
+                }
+            },
+
+            synthesizeTick(time) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, time);
+                gain.gain.setValueAtTime(0.04, time);
+                gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+                
+                osc.start(time);
+                osc.stop(time + 0.04);
+            },
+
+            synthesizeReady(time) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, time); // E5
+                osc.frequency.exponentialRampToValueAtTime(880, time + 0.12); // A5
+                
+                gain.gain.setValueAtTime(0.12, time);
+                gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+                
+                osc.start(time);
+                osc.stop(time + 0.12);
+            },
+
+            synthesizeSuccess(time, timeMs) {
+                // Determine musical notes based on reaction latency
+                let baseFreq = 523.25; // C5 default (Good)
+                if (timeMs < 150) baseFreq = 783.99; // G5 (Godlike)
+                else if (timeMs > 350) baseFreq = 392.00; // G4 (Sluggish)
+
+                const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5]; // Major chord triad
+                const duration = 0.15;
+
+                notes.forEach((freq, index) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, time + (index * 0.06));
+                    
+                    gain.gain.setValueAtTime(0.08, time + (index * 0.06));
+                    gain.gain.exponentialRampToValueAtTime(0.0001, time + (index * 0.06) + duration);
+                    
+                    osc.start(time + (index * 0.06));
+                    osc.stop(time + (index * 0.06) + duration);
+                });
+            },
+
+            synthesizeError(time) {
+                const osc = this.ctx.createOscillator();
+                const filter = this.ctx.createBiquadFilter();
+                const gain = this.ctx.createGain();
+                
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, time);
+                osc.frequency.linearRampToValueAtTime(60, time + 0.3);
+                
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(200, time);
+                
+                gain.gain.setValueAtTime(0.15, time);
+                gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.35);
+                
+                osc.start(time);
+                osc.stop(time + 0.35);
+            }
+        };
+
+        /* ==========================================
+           2. THREE.JS 3D GRAPHICS SUBENGINE
+           ========================================== */
+        const Scene3D = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            container: null,
+            canvas: null,
+            
+            // Dynamic elements
+            currentMesh: null,
+            particleSystem: null,
+            lights: {},
+            
+            // Interaction tracking variables
+            mouseX: 0,
+            mouseY: 0,
+            targetRotationX: 0,
+            targetRotationY: 0,
+            
+            // Color map mapping game state colors for lights & objects
+            colors: {
+                idle: 0x10B981,
+                waiting: 0xF59E0B,
+                ready: 0x34D399,
+                results: 0x10B981,
+                error: 0xEF4444
+            },
+
+            init() {
+                this.container = document.getElementById('viewport-click-area');
+                this.canvas = document.getElementById('three-canvas');
+                
+                // Initialize Scene
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x0F172A, 0.08);
+
+                // Camera Setup
+                const rect = this.container.getBoundingClientRect();
+                this.camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 100);
+                this.camera.position.z = 7;
+
+                // Renderer Setup
+                this.renderer = new THREE.WebGLRenderer({ 
+                    canvas: this.canvas, 
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: "high-performance"
+                });
+                this.renderer.setSize(rect.width, rect.height);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                
+                // Setup Lighting System
+                this.setupLights();
+                
+                // Setup Particle Space Background
+                this.setupParticles();
+
+                // Load initial Dodecahedron shape
+                this.transitionShape(STATES.IDLE);
+
+                // Add mouse tracking events
+                this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                
+                // Window Resize event
+                window.addEventListener('resize', () => this.handleResize());
+                
+                // Run Render loop
+                this.animate();
+            },
+
+            setupLights() {
+                // Dim ambient fill
+                this.lights.ambient = new THREE.AmbientLight(0xffffff, 0.2);
+                this.scene.add(this.lights.ambient);
+
+                // Orbiting Spotlight (adds specular highlights)
+                this.lights.spot = new THREE.SpotLight(0xffffff, 1.5, 30, 0.4, 0.5, 1);
+                this.lights.spot.position.set(0, 5, 5);
+                this.scene.add(this.lights.spot);
+
+                // Dynamic glow light inside/underneath shapes
+                this.lights.glow = new THREE.PointLight(this.colors.idle, 3, 10);
+                this.lights.glow.position.set(0, 0, 0);
+                this.scene.add(this.lights.glow);
+            },
+
+            setupParticles() {
+                const particleCount = 180;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const velocities = [];
+
+                for (let i = 0; i < particleCount * 3; i += 3) {
+                    // Spherical shell distribution around the center
+                    const radius = 2.5 + Math.random() * 3.5;
+                    const u = Math.random();
+                    const v = Math.random();
+                    const theta = u * 2.0 * Math.PI;
+                    const phi = Math.acos(2.0 * v - 1.0);
+                    
+                    positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i+1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i+2] = radius * Math.cos(phi);
+
+                    // Random drift velocities
+                    velocities.push({
+                        x: (Math.random() - 0.5) * 0.002,
+                        y: (Math.random() - 0.5) * 0.002,
+                        z: (Math.random() - 0.5) * 0.002,
+                        burstX: 0,
+                        burstY: 0,
+                        burstZ: 0
+                    });
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                // Shader Material style for particles
+                const material = new THREE.PointsMaterial({
+                    color: 0x34D399,
+                    size: 0.04,
+                    transparent: true,
+                    opacity: 0.6,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.particleSystem = new THREE.Points(geometry, material);
+                this.particleSystem.velocities = velocities;
+                this.scene.add(this.particleSystem);
+            },
+
+            handleMouseMove(e) {
+                const rect = this.container.getBoundingClientRect();
+                // Normalized coordinates between -1 and 1
+                this.mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                this.mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                // Calculate targets
+                this.targetRotationY = this.mouseX * 0.35;
+                this.targetRotationX = -this.mouseY * 0.35;
+            },
+
+            handleResize() {
+                const rect = this.container.getBoundingClientRect();
+                this.camera.aspect = rect.width / rect.height;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(rect.width, rect.height);
+            },
+
+            cleanUpMesh() {
+                if (this.currentMesh) {
+                    this.scene.remove(this.currentMesh);
+                    if (this.currentMesh.geometry) this.currentMesh.geometry.dispose();
+                    if (this.currentMesh.material) {
+                        if (Array.isArray(this.currentMesh.material)) {
+                            this.currentMesh.material.forEach(m => m.dispose());
+                        } else {
+                            this.currentMesh.material.dispose();
+                        }
+                    }
+                    this.currentMesh = null;
+                }
+            },
+
+            transitionShape(state) {
+                this.cleanUpMesh();
+
+                let geometry, material;
+                let meshColor = this.colors.idle;
+
+                switch (state) {
+                    case STATES.IDLE:
+                        meshColor = this.colors.idle;
+                        geometry = new THREE.DodecahedronGeometry(1.4, 1);
+                        material = new THREE.MeshPhysicalMaterial({
+                            color: meshColor,
+                            wireframe: true,
+                            roughness: 0.2,
+                            metalness: 0.8,
+                            emissive: meshColor,
+                            emissiveIntensity: 0.3
+                        });
+                        break;
+
+                    case STATES.WAITING:
+                        meshColor = this.colors.waiting;
+                        geometry = new THREE.TorusKnotGeometry(0.85, 0.24, 100, 16, 2, 3);
+                        material = new THREE.MeshStandardMaterial({
+                            color: meshColor,
+                            roughness: 0.4,
+                            metalness: 0.9,
+                            flatShading: true
+                        });
+                        break;
+
+                    case STATES.STIMULUS:
+                        meshColor = this.colors.ready;
+                        geometry = new THREE.IcosahedronGeometry(1.3, 0); // Faceted octa-ish/icosa-ish shape
+                        material = new THREE.MeshPhysicalMaterial({
+                            color: meshColor,
+                            roughness: 0.1,
+                            metalness: 1.0,
+                            emissive: meshColor,
+                            emissiveIntensity: 0.7,
+                            clearcoat: 1.0,
+                            clearcoatRoughness: 0.1
+                        });
+                        // Trigger particle velocity explosion on stimulus
+                        this.triggerParticleBurst(1);
+                        break;
+
+                    case STATES.RESULT:
+                        meshColor = this.colors.results;
+                        geometry = new THREE.SphereGeometry(1.3, 32, 32);
+                        material = new THREE.MeshPhysicalMaterial({
+                            color: meshColor,
+                            roughness: 0.1,
+                            metalness: 0.1,
+                            transmission: 0.6,
+                            thickness: 1.5,
+                            clearcoat: 1.0
+                        });
+                        this.triggerParticleBurst(0.2); // Smaller celebratory burst
+                        break;
+
+                    case STATES.FALSE_START:
+                        meshColor = this.colors.error;
+                        geometry = new THREE.OctahedronGeometry(1.3, 0);
+                        material = new THREE.MeshPhysicalMaterial({
+                            color: meshColor,
+                            roughness: 0.8,
+                            metalness: 0.2,
+                            emissive: meshColor,
+                            emissiveIntensity: 0.4
+                        });
+                        break;
+                }
+
+                // Update internal light source color to reflect the state
+                if (this.lights.glow) {
+                    this.lights.glow.color.setHex(meshColor);
+                }
+
+                this.currentMesh = new THREE.Mesh(geometry, material);
+                this.currentMesh.castShadow = true;
+                this.currentMesh.receiveShadow = true;
+                this.scene.add(this.currentMesh);
+            },
+
+            triggerParticleBurst(scale = 1.0) {
+                if (!this.particleSystem) return;
+                const pos = this.particleSystem.geometry.attributes.position.array;
+                const vels = this.particleSystem.velocities;
+
+                for (let i = 0; i < vels.length; i++) {
+                    const idx = i * 3;
+                    const x = pos[idx];
+                    const y = pos[idx+1];
+                    const z = pos[idx+2];
+
+                    // Compute unit direction outwards from center
+                    const len = Math.sqrt(x*x + y*y + z*z) || 1.0;
+                    
+                    vels[i].burstX = (x / len) * 0.08 * scale;
+                    vels[i].burstY = (y / len) * 0.08 * scale;
+                    vels[i].burstZ = (z / len) * 0.08 * scale;
+                }
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const time = Date.now() * 0.001;
+
+                // 1. Slow orbit of lighting Rig
+                if (this.lights.spot) {
+                    this.lights.spot.position.x = Math.sin(time * 0.4) * 6;
+                    this.lights.spot.position.z = Math.cos(time * 0.4) * 6;
+                }
+
+                // 2. Mesh state animation routines
+                if (this.currentMesh) {
+                    // Physics/Inertia rotation coupling with mouse position
+                    this.currentMesh.rotation.y += (this.targetRotationY - this.currentMesh.rotation.y) * 0.05;
+                    this.currentMesh.rotation.x += (this.targetRotationX - this.currentMesh.rotation.x) * 0.05;
+
+                    // Continuous background rotations
+                    switch (currentState) {
+                        case STATES.IDLE:
+                            this.currentMesh.rotation.y += 0.008;
+                            this.currentMesh.scale.setScalar(1.0 + Math.sin(time * 2.0) * 0.05);
+                            break;
+                            
+                        case STATES.WAITING:
+                            this.currentMesh.rotation.y += 0.004;
+                            this.currentMesh.rotation.z += 0.005;
+                            // Pulsing scale
+                            this.currentMesh.scale.setScalar(0.95 + Math.sin(time * 6.0) * 0.08);
+                            break;
+
+                        case STATES.STIMULUS:
+                            // Spinning rapidly
+                            this.currentMesh.rotation.y += 0.09;
+                            this.currentMesh.rotation.x += 0.04;
+                            break;
+
+                        case STATES.RESULT:
+                            // Slow floating oscillation
+                            this.currentMesh.rotation.y += 0.005;
+                            this.currentMesh.position.y = Math.sin(time * 3.0) * 0.15;
+                            break;
+
+                        case STATES.FALSE_START:
+                            // Random Jitter / Tremble
+                            this.currentMesh.position.x = (Math.random() - 0.5) * 0.08;
+                            this.currentMesh.position.y = (Math.random() - 0.5) * 0.08;
+                            this.currentMesh.scale.setScalar(0.9);
+                            break;
+                    }
+                }
+
+                // 3. Render Particles animation & update
+                if (this.particleSystem) {
+                    const pos = this.particleSystem.geometry.attributes.position.array;
+                    const vels = this.particleSystem.velocities;
+
+                    for (let i = 0; i < vels.length; i++) {
+                        const idx = i * 3;
+
+                        // Apply current standard speed + burst decay
+                        pos[idx] += vels[i].x + vels[i].burstX;
+                        pos[idx+1] += vels[i].y + vels[i].burstY;
+                        pos[idx+2] += vels[i].z + vels[i].burstZ;
+
+                        // Friction / damp down the burst expansion force
+                        vels[i].burstX *= 0.93;
+                        vels[i].burstY *= 0.93;
+                        vels[i].burstZ *= 0.93;
+
+                        // Check limits, pull back to center if drift too far out (6.0 units max)
+                        const dSq = pos[idx]*pos[idx] + pos[idx+1]*pos[idx+1] + pos[idx+2]*pos[idx+2];
+                        if (dSq > 36.0) {
+                            pos[idx] = (Math.random() - 0.5) * 2.0;
+                            pos[idx+1] = (Math.random() - 0.5) * 2.0;
+                            pos[idx+2] = (Math.random() - 0.5) * 2.0;
+                        }
+                    }
+                    this.particleSystem.geometry.attributes.position.needsUpdate = true;
+                    
+                    // Rotate the particle system box slowly
+                    this.particleSystem.rotation.y -= 0.001;
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        /* ==========================================
+           3. APPLICATION CONTROLLER & STATS MECHANICS
+           ========================================== */
+        const App = {
+            init() {
+                // Initialize Three.js WebGL subengine
+                Scene3D.init();
+
+                // Set up event UI listeners
+                this.bindEvents();
+                
+                // Clear UI state initially
+                this.transitionUIState(STATES.IDLE);
+            },
+
+            bindEvents() {
+                // Core triggers
+                DOM.btnStart.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Avoid triggering click-area immediate trigger
+                    this.triggerStartAction();
+                });
+
+                DOM.viewportClickArea.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    this.handleReaction();
+                });
+
+                // Keypress bindings
+                window.addEventListener('keydown', (e) => {
+                    if (keyboardEnabled && e.code === 'Space') {
+                        e.preventDefault();
+                        this.handleReaction();
+                    }
+                });
+
+                // Key checkbox
+                DOM.toggleKeyboard.addEventListener('change', (e) => {
+                    keyboardEnabled = e.target.checked;
+                });
+
+                // Top Actions
+                DOM.btnAudioToggle.addEventListener('click', () => {
+                    AudioEngine.toggleMute();
+                });
+
+                DOM.btnInfoModal.addEventListener('click', () => {
+                    DOM.infoModal.classList.add('active');
+                });
+
+                DOM.modalCloseBtn.addEventListener('click', () => {
+                    DOM.infoModal.classList.remove('active');
+                });
+
+                DOM.linkRules.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    DOM.infoModal.classList.add('active');
+                });
+
+                DOM.infoModal.addEventListener('click', (e) => {
+                    if (e.target === DOM.infoModal) {
+                        DOM.infoModal.classList.remove('active');
+                    }
+                });
+
+                DOM.btnClearStats.addEventListener('click', () => {
+                    if (confirm('Reset benchmark history? This will delete current session stats.')) {
+                        AiBotController.stopDemo();
+                        this.clearSessionStats();
+                    }
+                });
+
+                DOM.btnAiDemo.addEventListener('click', () => {
+                    AiBotController.startDemo();
+                });
+
+                DOM.btnSkipAi.addEventListener('click', () => {
+                    AiBotController.skipDemo();
+                });
+
+                DOM.toggleAiMode.addEventListener('change', (e) => {
+                    AiBotController.setContinuousMode(e.target.checked);
+                });
+            },
+
+            triggerStartAction() {
+                if (AiBotController.active) {
+                    AiBotController.skipDemo();
+                    return;
+                }
+                if (currentState === STATES.IDLE || currentState === STATES.RESULT || currentState === STATES.FALSE_START) {
+                    this.primeTimer();
+                }
+            },
+
+            handleReaction() {
+                if (AiBotController.active) {
+                    AiBotController.skipDemo();
+                    return;
+                }
+
+                const timeStamp = performance.now();
+
+                switch (currentState) {
+                    case STATES.IDLE:
+                        // Starts test when they click the main screen
+                        this.primeTimer();
+                        break;
+
+                    case STATES.WAITING:
+                        // CLICKED TOO EARLY (FALSE START)
+                        this.handleFalseStart();
+                        break;
+
+                    case STATES.STIMULUS:
+                        // SUCCESSFUL CLICK
+                        this.handleSuccess(timeStamp);
+                        break;
+
+                    case STATES.RESULT:
+                    case STATES.FALSE_START:
+                        // Click again resets to waiting
+                        this.primeTimer();
+                        break;
+                }
+            },
+
+            primeTimer() {
+                // Clear any existing active stimuli routines
+                if (stimulusTimeoutId) {
+                    clearTimeout(stimulusTimeoutId);
+                }
+
+                currentState = STATES.WAITING;
+                this.transitionUIState(STATES.WAITING);
+                Scene3D.transitionShape(STATES.WAITING);
+                
+                // Audio queue ticks
+                AudioEngine.play(CONFIG.SOUNDS.TICK);
+
+                const delay = CONFIG.MIN_DELAY + Math.random() * (CONFIG.MAX_DELAY - CONFIG.MIN_DELAY);
+                
+                stimulusTimeoutId = setTimeout(() => {
+                    this.triggerStimulus();
+                }, delay);
+            },
+
+            triggerStimulus() {
+                currentState = STATES.STIMULUS;
+                timerStart = performance.now();
+                
+                this.transitionUIState(STATES.STIMULUS);
+                Scene3D.transitionShape(STATES.STIMULUS);
+                
+                AudioEngine.play(CONFIG.SOUNDS.READY);
+
+                if (AiBotController.active) {
+                    AiBotController.onStimulusActive();
+                }
+            },
+
+            handleFalseStart() {
+                if (stimulusTimeoutId) {
+                    clearTimeout(stimulusTimeoutId);
+                }
+
+                currentState = STATES.FALSE_START;
+                
+                this.transitionUIState(STATES.FALSE_START);
+                Scene3D.transitionShape(STATES.FALSE_START);
+                
+                AudioEngine.play(CONFIG.SOUNDS.ERROR);
+
+                // Add visual shake effect to viewport card
+                DOM.viewportClickArea.classList.add('false-start-shake');
+                setTimeout(() => {
+                    DOM.viewportClickArea.classList.remove('false-start-shake');
+                }, 400);
+            },
+
+            handleSuccess(endTime, isAi = false) {
+                const elapsed = endTime - timerStart;
+                currentState = STATES.RESULT;
+
+                this.transitionUIState(STATES.RESULT, elapsed);
+                Scene3D.transitionShape(STATES.RESULT);
+
+                AudioEngine.play(CONFIG.SOUNDS.SUCCESS, elapsed);
+
+                // Log run details
+                this.saveRun(elapsed, isAi);
+
+                if (AiBotController.active) {
+                    AiBotController.onRunCompleted();
+                }
+            },
+
+            saveRun(timeMs, isAi = false) {
+                sessionRuns.push({ time: timeMs, isAi: isAi });
+                this.updateMetrics();
+                this.renderRunLog();
+                this.drawSvgChart();
+            },
+
+            clearSessionStats() {
+                sessionRuns = [];
+                currentState = STATES.IDLE;
+                
+                this.transitionUIState(STATES.IDLE);
+                Scene3D.transitionShape(STATES.IDLE);
+                
+                this.updateMetrics();
+                this.renderRunLog();
+                this.drawSvgChart();
+            },
+
+            updateMetrics() {
+                const count = sessionRuns.length;
+                DOM.statAttempts.textContent = count;
+
+                if (count === 0) {
+                    DOM.statBest.textContent = '--';
+                    DOM.statAverage.textContent = '--';
+                    return;
+                }
+
+                const times = sessionRuns.map(r => typeof r === 'object' ? r.time : r);
+                const best = Math.min(...times);
+                const average = times.reduce((a, b) => a + b, 0) / count;
+
+                DOM.statBest.textContent = `${best.toFixed(0)} ms`;
+                DOM.statAverage.textContent = `${average.toFixed(0)} ms`;
+            },
+
+            renderRunLog() {
+                if (sessionRuns.length === 0) {
+                    DOM.historyList.innerHTML = `
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.75rem; margin-top: 3rem;">
+                            No runs recorded in this session.
+                        </div>`;
+                    return;
+                }
+
+                // Show only last N runs
+                const listHTML = sessionRuns
+                    .slice()
+                    .reverse()
+                    .slice(0, CONFIG.MAX_HISTORY_ENTRIES)
+                    .map((item, idx) => {
+                        const originalIndex = sessionRuns.length - idx;
+                        const time = typeof item === 'object' ? item.time : item;
+                        const isAi = typeof item === 'object' ? item.isAi : false;
+                        const rating = this.classifyResponse(time);
+                        const aiBadgeHTML = isAi ? `<span class="rating-badge badge-ai">AI BOT</span>` : '';
+                        return `
+                            <div class="history-item">
+                                <span class="history-number">Attempt #${originalIndex}</span>
+                                <span class="history-time-value">${time.toFixed(1)} ms</span>
+                                <div>
+                                    <span class="rating-badge badge-${rating.class}">${rating.label}</span>
+                                    ${aiBadgeHTML}
+                                </div>
+                            </div>
+                        `;
+                    })
+                    .join('');
+
+                DOM.historyList.innerHTML = listHTML;
+            },
+
+            classifyResponse(timeMs) {
+                if (timeMs < 150) return { label: 'Superhuman', class: 'godlike' };
+                if (timeMs < 250) return { label: 'Optimal', class: 'fast' };
+                if (timeMs < 400) return { label: 'Standard', class: 'average' };
+                return { label: 'Sluggish', class: 'slow' };
+            },
+
+            drawSvgChart() {
+                const container = DOM.chartContainer;
+                const times = sessionRuns.map(r => typeof r === 'object' ? r.time : r);
+                
+                if (times.length < 2) {
+                    container.innerHTML = `
+                        <div class="chart-placeholder" id="chart-placeholder">
+                            Benchmark runs are displayed here as a reflex curve line-graph.
+                        </div>`;
+                    return;
+                }
+
+                const width = container.clientWidth || 300;
+                const height = 120;
+                const padding = 15;
+
+                // Max values for auto-scaling graph
+                const maxVal = Math.max(...times, 450); // Minimum scale height 450ms
+                const minVal = Math.min(...times, 100);
+
+                const dataPoints = times.slice(-CONFIG.MAX_HISTORY_ENTRIES);
+                const pointsCount = dataPoints.length;
+
+                // Generate point coordinates
+                const coords = dataPoints.map((val, index) => {
+                    const x = padding + (index / (pointsCount - 1)) * (width - 2 * padding);
+                    // Invert y: higher values (slower reaction) are lower on graph
+                    const y = height - padding - ((val - minVal) / (maxVal - minVal || 1)) * (height - 2 * padding);
+                    return { x, y, value: val };
+                });
+
+                // Generate path string
+                let pathString = `M ${coords[0].x} ${coords[0].y}`;
+                for (let i = 1; i < coords.length; i++) {
+                    pathString += ` L ${coords[i].x} ${coords[i].y}`;
+                }
+
+                // Gradient background under the curve path string
+                let fillPathString = `${pathString} L ${coords[coords.length - 1].x} ${height - padding} L ${coords[0].x} ${height - padding} Z`;
+
+                // SVG construction
+                let svgContent = `
+                    <svg width="${width}" height="${height}" style="overflow: visible;">
+                        <defs>
+                            <linearGradient id="chart-gradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"/>
+                                <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <!-- Grid lines -->
+                        <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}" stroke="rgba(255,255,255,0.03)" />
+                        <line x1="${padding}" y1="${height / 2}" x2="${width - padding}" y2="${height / 2}" stroke="rgba(255,255,255,0.03)" />
+                        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(255,255,255,0.05)" />
+                        
+                        <!-- Glow Area under curve -->
+                        <path d="${fillPathString}" fill="url(#chart-gradient)" />
+                        
+                        <!-- Core Line -->
+                        <path d="${pathString}" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+                `;
+
+                // Add interactive dots overlay
+                coords.forEach((pt, index) => {
+                    svgContent += `
+                        <circle cx="${pt.x}" cy="${pt.y}" r="4" fill="#F1F5F9" stroke="#10B981" stroke-width="2">
+                            <title>Run ${times.length - pointsCount + index + 1}: ${pt.value.toFixed(0)}ms</title>
+                        </circle>
+                    `;
+                });
+
+                svgContent += `</svg>`;
+                container.innerHTML = svgContent;
+            },
+
+            transitionUIState(state, customVal = null) {
+                // Remove all state classes from targets
+                DOM.statusPanel.className = 'glass-panel status-card';
+                DOM.viewportClickArea.className = 'glass-panel stimulus-viewport';
+
+                switch (state) {
+                    case STATES.IDLE:
+                        DOM.statusPanel.classList.add('state-idle');
+                        DOM.statusLabel.textContent = "Engine Ready";
+                        DOM.statusValue.textContent = "Standby";
+                        DOM.statusDesc.textContent = "Press START or tap the canvas view to begin.";
+                        DOM.btnStart.disabled = false;
+                        
+                        DOM.viewportBadgeText.textContent = "Idle";
+                        DOM.viewportPromptText.textContent = "TAP VIEWPORT TO BENCH";
+                        DOM.viewportPromptText.style.display = "block";
+                        break;
+
+                    case STATES.WAITING:
+                        DOM.statusPanel.classList.add('state-waiting');
+                        DOM.viewportClickArea.classList.add('state-waiting');
+                        DOM.statusLabel.textContent = AiBotController.active ? "AI Calibration Active" : "Benchmark Active";
+                        DOM.statusValue.textContent = "Wait for it...";
+                        DOM.statusDesc.textContent = AiBotController.active ? "AI is waiting for the visual stimulus..." : "Hold still! Click as fast as you can when the object turns green.";
+                        DOM.btnStart.disabled = true;
+
+                        DOM.viewportBadgeText.textContent = AiBotController.active ? "AI Priming..." : "Priming timer...";
+                        DOM.viewportPromptText.textContent = "WAIT FOR EMERALD FLASH";
+                        DOM.viewportPromptText.style.display = "block";
+                        break;
+
+                    case STATES.STIMULUS:
+                        DOM.statusPanel.classList.add('state-ready');
+                        DOM.viewportClickArea.classList.add('state-ready');
+                        DOM.statusLabel.textContent = AiBotController.active ? "AI Stimulus Triggered" : "Visual Stimulus Active";
+                        DOM.statusValue.textContent = AiBotController.active ? "AI RESPONDING..." : "CLICK NOW!";
+                        DOM.statusDesc.textContent = AiBotController.active ? "Simulating optimal neural reflex..." : "Tear it down! Hit spacebar or trigger the viewport click event immediately!";
+
+                        DOM.viewportBadgeText.textContent = AiBotController.active ? "AI STIMULUS ACTIVE" : "STIMULUS ACTIVE";
+                        DOM.viewportPromptText.textContent = AiBotController.active ? "AI TRIGGER" : "CLICK NOW!";
+                        DOM.viewportPromptText.style.display = "block";
+                        break;
+
+                    case STATES.RESULT:
+                        DOM.statusPanel.classList.add('state-results');
+                        DOM.viewportClickArea.classList.add('state-results');
+                        DOM.statusLabel.textContent = AiBotController.active ? "AI Run Evaluated" : "Bench Finished";
+                        DOM.statusValue.textContent = `${customVal.toFixed(0)} ms`;
+                        
+                        const rating = this.classifyResponse(customVal);
+                        DOM.statusDesc.textContent = AiBotController.active ? `AI Reflex Score: ${rating.label} (${customVal.toFixed(0)} ms).` : `Reaction Rating: ${rating.label}. Press START or tap the canvas to repeat.`;
+                        DOM.btnStart.disabled = false;
+
+                        DOM.viewportBadgeText.textContent = "Run Evaluated";
+                        DOM.viewportPromptText.textContent = `RESULT: ${customVal.toFixed(0)}ms`;
+                        break;
+
+                    case STATES.FALSE_START:
+                        DOM.statusPanel.classList.add('state-error');
+                        DOM.viewportClickArea.classList.add('state-error');
+                        DOM.statusLabel.textContent = "Benchmark Interrupted";
+                        DOM.statusValue.textContent = "False Start";
+                        DOM.statusDesc.textContent = "Reflex trigger released too early. Click START to reset system.";
+                        DOM.btnStart.disabled = false;
+
+                        DOM.viewportBadgeText.textContent = "Aborted";
+                        DOM.viewportPromptText.textContent = "TOO EARLY!";
+                        break;
+                }
+            }
+        };
+
+        /* ==========================================
+           4. AI AUTONOMOUS TEST RUN CONTROLLER
+           ========================================== */
+        const AiBotController = {
+            active: false,
+            continuousMode: false,
+            runIndex: 0,
+            maxRuns: 3,
+            timerId: null,
+
+            setContinuousMode(enable) {
+                this.continuousMode = enable;
+                if (DOM.toggleAiMode) DOM.toggleAiMode.checked = enable;
+                if (enable) {
+                    this.startDemo();
+                } else {
+                    this.stopDemo("AI Auto-Player Mode disabled.");
+                }
+            },
+
+            startDemo() {
+                this.stopDemo(); // clear any previous state
+                this.active = true;
+                this.runIndex = 1;
+                
+                DOM.btnAiDemo.classList.add('ai-active');
+                DOM.aiOverlayBanner.style.display = 'flex';
+                this.updateBannerText();
+
+                // Start first AI run after a short priming pause
+                this.timerId = setTimeout(() => {
+                    if (this.active) {
+                        App.primeTimer();
+                    }
+                }, 600);
+            },
+
+            updateBannerText() {
+                if (this.continuousMode) {
+                    DOM.aiBannerText.textContent = `🤖 AI Auto-Player Active (Run #${this.runIndex})`;
+                } else {
+                    DOM.aiBannerText.textContent = `🤖 AI Calibration Run ${this.runIndex}/${this.maxRuns}`;
+                }
+            },
+
+            onStimulusActive() {
+                if (!this.active) return;
+
+                // Simulate realistic human/AI reflex latency between 165ms and 225ms
+                const aiLatency = 165 + Math.random() * 60;
+                
+                this.timerId = setTimeout(() => {
+                    if (this.active && currentState === STATES.STIMULUS) {
+                        const simulatedEndTime = performance.now();
+                        App.handleSuccess(simulatedEndTime, true);
+                    }
+                }, aiLatency);
+            },
+
+            onRunCompleted() {
+                if (!this.active) return;
+
+                if (this.continuousMode || this.runIndex < this.maxRuns) {
+                    this.runIndex++;
+                    this.updateBannerText();
+
+                    // Wait 1.4s so the user can see the result, then run next test
+                    this.timerId = setTimeout(() => {
+                        if (this.active) {
+                            App.primeTimer();
+                        }
+                    }, 1400);
+                } else {
+                    // All AI runs completed
+                    this.timerId = setTimeout(() => {
+                        this.stopDemo("AI Calibration Complete! User Control Enabled.");
+                    }, 1200);
+                }
+            },
+
+            skipDemo() {
+                this.continuousMode = false;
+                if (DOM.toggleAiMode) DOM.toggleAiMode.checked = false;
+                this.stopDemo("AI Demo skipped. System ready for manual test.");
+            },
+
+            stopDemo(message = null) {
+                if (this.timerId) {
+                    clearTimeout(this.timerId);
+                    this.timerId = null;
+                }
+                this.active = false;
+                DOM.btnAiDemo.classList.remove('ai-active');
+                DOM.aiOverlayBanner.style.display = 'none';
+
+                if (message) {
+                    DOM.statusDesc.textContent = message;
+                }
+
+                if (currentState === STATES.WAITING) {
+                    if (stimulusTimeoutId) clearTimeout(stimulusTimeoutId);
+                    currentState = STATES.IDLE;
+                    App.transitionUIState(STATES.IDLE);
+                    Scene3D.transitionShape(STATES.IDLE);
+                }
+            }
+        };
+
+        // Launch Application
+        window.addEventListener('DOMContentLoaded', () => {
+            App.init();
+            // Automatically launch AI test runs on startup
+            AiBotController.startDemo();
+        });
+    </script>
 </body>
 </html>
